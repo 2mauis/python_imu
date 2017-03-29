@@ -15,6 +15,11 @@ import ekf_filter as ekf
 filter =ekf.ekf_filter()
 
 
+import time as tm
+time_str = tm.strftime('%Y-%m-%d-%H-%M-%S',tm.localtime(tm.time()))
+file_name='arhs-'+time_str+'.txt'
+
+#fo = open(file_name, "wb")
 while 1:
 	data = ser.get_data(com_port)
 	acc=data[:3]
@@ -26,6 +31,20 @@ while 1:
 		filter.filter_init(gyro,acc)
 		filter.init_flag=1	
 	else:
-		a=filter.filter_update(gyro,acc,0.002)
-		erual= np.array([a])
-		print erual*180/np.pi,erula_cal
+		data=filter.filter_update(gyro,acc,0.001)
+	
+		erual =data*180/np.pi
+		stra=' '
+		stra+=str(erual[0]) +' '
+		stra+=str(erual[1]) +' '
+		stra+=str(erual[2]) +' '
+
+		stra+=str(erula_cal[0]) +' '
+		stra+=str(erula_cal[1]) +' '
+		stra+=str(erula_cal[2]) +' '
+		stra+='\n'
+		print stra
+		#fo.write(stra);
+
+
+

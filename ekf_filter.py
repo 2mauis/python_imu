@@ -25,7 +25,7 @@ def qa_to_erula_angle(q):
 		num=1.0
 	PitchAngle = asin(num)
 	YawAngle = atan2(2.0*q1*q2 - 2.0*q0*q3,  2.0*Sqr(q0) + 2.0*Sqr(q1) - 1.0);
-	return [PitchAngle,RollAngle,YawAngle]
+	return np.array([PitchAngle,RollAngle,YawAngle])
 
 def EKF_IMUGetAngle(X):
 	CBn=np.zeros(9)
@@ -63,7 +63,7 @@ def EKF_IMUGetAngle(X):
 
 	if (YawAngle >= np.pi*2):
 		YawAngle = 0.0
-	return [PitchAngle,RollAngle,YawAngle]
+	return np.array([PitchAngle,RollAngle,YawAngle])
 
 
 
@@ -73,14 +73,18 @@ class ekf_filter(object):
 		self.status_dm =7
 		self.measure_dm =6
 		self.init_flag = 0
-		self.qq=0.000045
-		self.ra= 0.07
-		self.pq = 0.000001
 
-		self.qw=0.00025
+		self.qq=0.045 ##
+		self.qw=0.025
+
+
+		self.ra= 0.07 
 		self.rm=0.105
+
+		self.pq = 0.000001
 		self.pw =0.000010
-        ### 		
+        ### 
+        ### 对应陀螺漂移误差		
 		self.Q =    np.array([
 								[self.qq, 0, 0, 0, 0, 0, 0],
 								[0, self.qq, 0, 0, 0, 0, 0],
@@ -90,6 +94,7 @@ class ekf_filter(object):
 								[0, 0, 0, 0, 0, self.qw, 0],
 								[0, 0, 0, 0, 0, 0, self.qw],
 			                 ])
+		### 重力和磁场误差
 		self.R =  np.array([	
 							[self.ra, 0, 0, 0, 0, 0],
 							[0, self.ra, 0, 0, 0, 0],
@@ -117,50 +122,48 @@ class ekf_filter(object):
 		self.Y=np.zeros(self.measure_dm)
 		self.K=np.zeros((self.status_dm,self.measure_dm))
 	def filter_init(self,gyro,accel):
-		# nedVector = np.array([0, 0 , -1.0])
-		# accelVector=np.zeros(3)
-		# crossVector=np.zeros(3)
-		# #//unit accel
-		# norm =   FastSqrtI(accel[0] * accel[0] + accel[1] * accel[1] + accel[2] * accel[2]) 
+		nedVector = np.array([0, 0 , -1.0])
+		accelVector=np.zeros(3)
+		crossVector=np.zeros(3)
+		#//unit accel
+		norm =   FastSqrtI(accel[0] * accel[0] + accel[1] * accel[1] + accel[2] * accel[2]) 
 
-		# ## or use  norm = np.linalg.norm(accel)
-		# accelVector[0] = accel[0] * norm
-		# accelVector[1] = accel[1] * norm
-		# accelVector[2] = accel[2] * norm
+		## or use  norm = np.linalg.norm(accel)
+		accelVector[0] = accel[0] * norm
+		accelVector[1] = accel[1] * norm
+		accelVector[2] = accel[2] * norm
      
-		# #cross product between accel and reference
-		# crossVector[0] = accelVector[1] * nedVector[2] - accelVector[2] * nedVector[1]
-		# crossVector[1] = accelVector[2] * nedVector[0] - accelVector[0] * nedVector[2]
-		# crossVector[2] = accelVector[0] * nedVector[1] - accelVector[1] * nedVector[0]
+		#cross product between accel and reference
+		crossVector[0] = accelVector[1] * nedVector[2] - accelVector[2] * nedVector[1]
+		crossVector[1] = accelVector[2] * nedVector[0] - accelVector[0] * nedVector[2]
+		crossVector[2] = accelVector[0] * nedVector[1] - accelVector[1] * nedVector[0]
 
-		# sinwi = FastSqrtI(crossVector[0] * crossVector[0] + crossVector[1] * crossVector[1] + crossVector[2] * crossVector[2])
-		# crossVector[0] *= sinwi
-		# crossVector[1] *= sinwi
-		# crossVector[2] *= sinwi
-		#  #the angle between accel and reference is the dot product of the two vectors
-		# cosw = accelVector[0] * nedVector[0] + accelVector[1] * nedVector[1] + accelVector[2] * nedVector[2]
+		sinwi = FastSqrtI(crossVector[0] * crossVector[0] + crossVector[1] * crossVector[1] + crossVector[2] * crossVector[2])
+		crossVector[0] *= sinwi
+		crossVector[1] *= sinwi
+		crossVector[2] *= sinwi
+		 #the angle between accel and reference is the dot product of the two vectors
+		cosw = accelVector[0] * nedVector[0] + accelVector[1] * nedVector[1] + accelVector[2] * nedVector[2]
 		# coshalfw = sqrt((1.0- cosw) * 0.5)
 		# sinhalfw = sqrt((1.0 +cosw) * 0.5)
 
-		# # coshalfw = sqrt((1.0 + cosw) * 0.5)
-		# # sinhalfw = sqrt((1.0 -cosw) * 0.5)
+		coshalfw = sqrt((1.0 + cosw) * 0.5)
+		sinhalfw = sqrt((1.0 -cosw) * 0.5)
 
-		# self.X[0] = coshalfw
-		# self.X[1] = crossVector[0] * sinhalfw
-		# self.X[2] = crossVector[1] * sinhalfw
-		# self.X[3] = crossVector[2] * sinhalfw
-		# print self.X
-		# norm = FastSqrtI(self.X[0] * self.X[0] + self.X[1] * self.X[1] + self.X[2] * self.X[2] + self.X[3] * self.X[3])
+		self.X[0] = coshalfw
+		self.X[1] = crossVector[0] * sinhalfw
+		self.X[2] = crossVector[1] * sinhalfw
+		self.X[3] = crossVector[2] * sinhalfw
 
-		# self.X[0] *= norm
-		# self.X[1] *= norm
-		# self.X[2] *= norm
-		# self.X[3] *= norm
-		 self.X[0] =1
+		norm = FastSqrtI(self.X[0] * self.X[0] + self.X[1] * self.X[1] + self.X[2] * self.X[2] + self.X[3] * self.X[3])
+
+		self.X[0] *= norm
+		self.X[1] *= norm
+		self.X[2] *= norm
+		self.X[3] *= norm
+
 	def filter_update(self,gyro,accel,dt=0.002):
-
 		halfdt =dt*0.5
-	
 		### 0.5*t(w - wbias)
 		##self.X[4:6]存储的是w的
 		halfdx = halfdt * (gyro[0] - self.X[4])
@@ -247,6 +250,7 @@ class ekf_filter(object):
 	    #计算Cbn 对X的Jacbian方程即可。H阵为6,7
 
 	    #即计算 四元素矩阵的Jacobin 公式
+
 		self.H[0][0] = _2q2
 		self.H[0][1] = -_2q3
 		self.H[0][2] = _2q0 
@@ -262,7 +266,6 @@ class ekf_filter(object):
 		self.H[2][2] = _2q2 
 		self.H[2][3] = -_2q3
 
-
 		#  //K=P*H'/(H*P*H'+R)
 		
 		S=np.dot(np.dot(self.H,self.P),self.H.T) + self.R
@@ -274,10 +277,10 @@ class ekf_filter(object):
 		# 	//X = X + K * Y;
 		# 	//acccel on  earth  [0 0  1]  is standard g vector 
 		# 	//计算重力在机体上的投影
-		#   为何为负值 存疑
+		#   为何为负值  对应H中负值
 		self.Y[0] = -2.0 * (self.X[1] * self.X[3] - self.X[0] * self.X[2])
 		self.Y[1] = -2.0 * (self.X[2] * self.X[3] + self.X[0] * self.X[1])
-		self.Y[2] =  1.0 - 2.0 * (self.X[0] * self.X[0] + self.X[3] * self.X[3])
+		self.Y[2] =  1.0 -2.0 * (self.X[0] * self.X[0] + self.X[3] * self.X[3])
 		#//normalize accel
 		#计算实际观测到的重力坐标
 		norm = FastSqrtI(accel[0] * accel[0] + accel[1] * accel[1] + accel[2] * accel[2])
