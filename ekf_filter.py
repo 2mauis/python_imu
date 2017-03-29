@@ -74,7 +74,7 @@ class ekf_filter(object):
 		self.measure_dm =6
 		self.init_flag = 0
 
-		self.qq=0.045 ##
+		self.qq=0.0045 ##
 		self.qw=0.025
 
 
@@ -121,6 +121,7 @@ class ekf_filter(object):
 		self.X=np.zeros(self.status_dm)
 		self.Y=np.zeros(self.measure_dm)
 		self.K=np.zeros((self.status_dm,self.measure_dm))
+		self.factor = 16.4*180.0/np.pi
 	def filter_init(self,gyro,accel):
 		nedVector = np.array([0, 0 , -1.0])
 		accelVector=np.zeros(3)
@@ -166,9 +167,9 @@ class ekf_filter(object):
 		halfdt =dt*0.5
 		### 0.5*t(w - wbias)
 		##self.X[4:6]存储的是w的
-		halfdx = halfdt * (gyro[0] - self.X[4])
-		halfdy = halfdt * (gyro[1] - self.X[5])
-		halfdz = halfdt * (gyro[2] - self.X[6])
+		halfdx = halfdt * (gyro[0]/self.factor - self.X[4])
+		halfdy = halfdt * (gyro[1]/self.factor - self.X[5])
+		halfdz = halfdt * (gyro[2]/self.factor - self.X[6])
 
 		neghalfdx = -halfdx
 		neghalfdy = -halfdy

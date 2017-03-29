@@ -18,9 +18,11 @@ from sklearn.preprocessing import normalize
 # norm2 = normalize(x[:,np.newaxis], axis=0).ravel()
 # print np.all(norm1 == norm2)
 
-
 import numpy as np
-b=np.ones((7,6))
-c =np.ones((6,7))
-a = np.dot(b,c)
-print a.shape
+# b=np.ones((7,6))
+# c =np.ones((6,7))
+# a = np.dot(b,c)
+# print a.shape
+stra ="-0.094727,0.008301,1.003906,0.011706,-0.006385,0.007449"
+a=np.fromstring(stra, dtype=float, sep=', ')
+print a

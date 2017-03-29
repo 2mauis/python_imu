@@ -18,6 +18,7 @@ def com_init():
   com= serial.Serial('COM3',115200,timeout=0)
   return com  
 
+  
 
 def get_num(input):
   val=0
@@ -79,6 +80,7 @@ def get_data(com):
       time.sleep(0.0005)
     # time.sleep(0.001)
   data = com.readall()
+
   #return 
   #return hexShow(data)
   return np.append(decode_acc(data),[decode_gyro(data),decode_erula(data)])

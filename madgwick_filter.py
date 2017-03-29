@@ -1,7 +1,7 @@
 
 # -*- coding: utf-8 -*-
 from math  import sqrt,atan2,asin
-from numpy  import  pi
+from numpy  import  pi,array
 
 def Sqr(x):
 	return x**2
@@ -17,7 +17,7 @@ def qa_to_erula_angle(q):
 		num=1.0
 	PitchAngle = asin(num)
 	YawAngle = atan2(2.0*q1*q2 - 2.0*q0*q3,  2.0*Sqr(q0) + 2.0*Sqr(q1) - 1.0);
-	return [PitchAngle,RollAngle,YawAngle]
+	return array([PitchAngle,RollAngle,YawAngle])
 ###def madgwick_filter
 class madgwick_filter(object):
 	"""docstring for ClassName"""
