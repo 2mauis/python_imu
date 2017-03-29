@@ -36,17 +36,19 @@ def EKF_IMUGetAngle(X):
 	# //CBn[3] = 2.0f * (X[1] * X[2] - X[0] * X[3]);
 	# //CBn[4] = 2.0f * (q0q0 + X[2] * X[2]) - 1.0f;
 	#CBn[5] = 2.0 * (X[2] * X[3] + X[0] * X[1])
-	CBn[5] = 2.0 * (X[2] * X[3] - X[0] * X[1])
+	CBn[5] = 2.0 * (X[2] * X[3] + X[0] * X[1])
 	# //CBn[6] = 2.0f * (X[1] * X[3] + X[0] * X[2]);
 	# //CBn[7] = 2.0f * (X[2] * X[3] - X[0] * X[1]);
 	CBn[8] = 2.0 * (X[0] * X[0] + X[3] * X[3]) - 1.0
 
 	#//roll
-	#rpy[0] = atan2(CBn[5], CBn[8])
+
 	RollAngle = atan2(CBn[5], CBn[8])
+
 	RollAngle -=np.pi
-	# if (rpy[0] == np.pi):
-	# 	rpy[0] = -np.pi
+	if(RollAngle<-np.pi):
+		RollAngle+=2*np.pi
+	RollAngle=-RollAngle
 	#//pitch
 	if (CBn[2] >= 1.0):
 		PitchAngle = -np.pi/2.0
@@ -155,11 +157,10 @@ class ekf_filter(object):
 		# self.X[2] *= norm
 		# self.X[3] *= norm
 		 self.X[0] =1
-	def filter_update(self,gyro,accel,dt):
+	def filter_update(self,gyro,accel,dt=0.002):
 
 		halfdt =dt*0.5
-		#print self.X
-		#这里相当于执行 xk=A*xk-1
+	
 		### 0.5*t(w - wbias)
 		##self.X[4:6]存储的是w的
 		halfdx = halfdt * (gyro[0] - self.X[4])
@@ -179,10 +180,11 @@ class ekf_filter(object):
 		# //state time propagation
 		# //Update Quaternion with the new gyroscope measurements
 		#x = x +∫f(x)dt 四元素方程微分形式
+		#这里相当于执行 xk=A*xk-1
 		self.X[0] = q0 - halfdx * q1 - halfdy * q2 - halfdz * q3
-		self.X[1] = q1 + halfdx * q0 - halfdy * q3 + halfdz * q2
-		self.X[2] = q2 + halfdx * q3 + halfdy * q0 - halfdz * q1
-		self.X[3] = q3 - halfdx * q2 + halfdy * q1 + halfdz * q0
+		self.X[1] = q1 + halfdx * q0 + halfdz * q2 - halfdy * q3 
+		self.X[2] = q2 + halfdy * q0 - halfdz * q1 + halfdx * q3 
+		self.X[3] = q3 + halfdz * q0 + halfdy * q1 - halfdx * q2 
 
 		halfdtq0 = halfdt * q0
 		neghalfdtq0 = -halfdtq0
@@ -194,8 +196,9 @@ class ekf_filter(object):
 		neghalfdtq3 = -halfdtq3
         #生成预测矩阵 F
         #有关系x = F*x
+        #对陀螺输出值进行积分有次计算姿态角
         # q0 = q0 - wx*q1/2 -  wy*q2/2 -（wz-wbias)*q3/2 
-		#/* F[0] = 1.0f; */ 
+		#self.F[0][0] =1
 		self.F[0][1] = neghalfdx
 		self.F[0][2] = neghalfdy
 		self.F[0][3] = neghalfdz
@@ -204,7 +207,7 @@ class ekf_filter(object):
 		self.F[0][6] = halfdtq3
 
 		self.F[1][0] = halfdx
-		# /* F[8] = 1.0f; */
+		#self.F[1][1] =1.0
 		self.F[1][2] = halfdz	
 		self.F[1][3] = neghalfdy
 		self.F[1][4] = neghalfdtq0 
@@ -214,7 +217,7 @@ class ekf_filter(object):
 
 		self.F[2][0] = halfdy
 		self.F[2][1] = neghalfdz
-		# /* F[16] = 1.0f; */
+	    #self.F[2][2]=1
 		self.F[2][3] = halfdx
 		self.F[2][4] = neghalfdtq3
 		self.F[2][5] = neghalfdtq0 
@@ -223,15 +226,12 @@ class ekf_filter(object):
 		self.F[3][0] = halfdz
 		self.F[3][1] = halfdy
 		self.F[3][2] = neghalfdx
-		# /* F[24] = 1.0f; */
+	    # self.F[3][3] = 1
 		self.F[3][4] = halfdtq2
 		self.F[3][5] = neghalfdtq1
 		self.F[3][6] = neghalfdtq0
-		#print self.F
-		# //P = F*P*F' + Q;
-		# Matrix_Multiply(F, EKF_STATE_DIM, EKF_STATE_DIM, P, EKF_STATE_DIM, PX);
-		# Matrix_Multiply_With_Transpose(PX, EKF_STATE_DIM, EKF_STATE_DIM, F, EKF_STATE_DIM, P);
-		# Maxtrix_Add(P, EKF_STATE_DIM, EKF_STATE_DIM, Q, P);
+
+		# //P = F*P*F' + Q
 		self.P= np.dot(np.dot(self.F,self.P),self.F.T) + self.Q
 
 
@@ -242,17 +242,15 @@ class ekf_filter(object):
 		# print self.H
 		_2q0,_2q1,_2q2,_2q3 = 2.0 * self.X[:4]
 		## 更新观察矩阵 
-		### H=J(f(q),x)   Jacobian
-		#print self.H
+		### H=J(y,x)   Jacobian
+	    # y = h(x)=Cbn*x
+	    #计算Cbn 对X的Jacbian方程即可。H阵为6,7
+
+	    #即计算 四元素矩阵的Jacobin 公式
 		self.H[0][0] = _2q2
 		self.H[0][1] = -_2q3
 		self.H[0][2] = _2q0 
 		self.H[0][3] = -_2q1
-
-		# self.H[1][1] = -_2q1
-		# self.H[1][2] = -_2q0 
-		# self.H[1][3] = -_2q3 
-		# self.H[1][4] = -_2q2
 
 		self.H[1][0] = -_2q1
 		self.H[1][1] = -_2q0 
@@ -263,17 +261,10 @@ class ekf_filter(object):
 		self.H[2][1] = _2q1 
 		self.H[2][2] = _2q2 
 		self.H[2][3] = -_2q3
-	    # H[0] = _2q2; H[1] = -_2q3; H[2] = _2q0; H[3] = -_2q1;
-		# H[8] = -_2q1; H[9] = -_2q0; H[10] = -_2q3; H[11] = -_2q2;
-		# H[14] = -_2q0; H[15] = _2q1; H[16] = _2q2; H[17] = -_2q3;
 
-		#endif
+
 		#  //K=P*H'/(H*P*H'+R)
-		# Matrix_Multiply_With_Transpose(P, EKF_STATE_DIM, EKF_STATE_DIM, H, EKF_MEASUREMENT_DIM, PXY);
-		# Matrix_Multiply(H, EKF_MEASUREMENT_DIM, EKF_STATE_DIM, PXY, EKF_MEASUREMENT_DIM, S);
-		# Maxtrix_Add(S, EKF_MEASUREMENT_DIM, EKF_MEASUREMENT_DIM, R, S);
-		# Matrix_Inverse(S, EKF_MEASUREMENT_DIM, SI);
-		# Matrix_Multiply(PXY, EKF_STATE_DIM, EKF_MEASUREMENT_DIM, SI, EKF_MEASUREMENT_DIM, K);
+		
 		S=np.dot(np.dot(self.H,self.P),self.H.T) + self.R
 		SI=np.linalg.inv(S)
 		self.K=np.dot(self.P,np.dot(self.H.T,SI))
@@ -290,21 +281,17 @@ class ekf_filter(object):
 		#//normalize accel
 		#计算实际观测到的重力坐标
 		norm = FastSqrtI(accel[0] * accel[0] + accel[1] * accel[1] + accel[2] * accel[2])
-		accel = accel*norm
+		acc=np.array(accel)
+		acc = acc*norm
 		# accel[0] *= norm;
 		# accel[1] *= norm;
 		# accel[2] *= norm;
-		# y-h(x) 算作误观测误差，这里本质上为用重力来慢校准陀螺误差
+		# y-h(x) 算作误观测误差，这里本质上为用重力来校准陀螺误差
 		# 对于磁力有类似的算法
-		#self.Y  = accel - self.Y
-
-		self.Y[0] = accel[0] - self.Y[0]
-		self.Y[1] = accel[1] - self.Y[1]
-		self.Y[2] = accel[2] - self.Y[2]
-
+		#Y阵当前为[accx,accy,accy,0,0,0]
+		#待添加磁校准形成观察阵[accx,accy,accy,mx,my,mz]
+		self.Y[:3]  = acc - self.Y[0:3]
 		# // Update State Vector
-		# Matrix_Multiply(K, EKF_STATE_DIM, EKF_MEASUREMENT_DIM, Y, 1, KY); //apply the same gain for accel gain
-		# Maxtrix_Add(X, EKF_STATE_DIM, 1, KY, X);// apply correct step
 		# X=X + K(Y-h(X))
 		self.X = self.X  + np.dot(self.K,self.Y)
 		
@@ -321,7 +308,7 @@ class ekf_filter(object):
 		# 	//or
 		# 	//P=(I - K*H)*P*(I - K*H)' + K*R*K'
 		self.P = np.dot(self.I - np.dot(self.K,self.H),self.P)
-		#print self.X
+
 		q=[self.X[0],self.X[1] ,self.X[2] ,self.X[3]]
 		#print q
 		return  EKF_IMUGetAngle(q)
@@ -332,6 +319,7 @@ if __name__ == '__main__':
 	filter=ekf_filter()
 	gyro=np.array([0,0,0])
 	acc=np.array([0,0,1])
-	filter.filter_init(gyro,acc)
-	filter.filter_update(gyro,acc,0.01)
+	a=filter.filter_update(gyro,acc,0.002)
+	erual= np.array([a])
+	print erual*180/np.pi
 

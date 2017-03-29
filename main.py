@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- 2oding: utf-8 -*-
 import com_d as ser
 
 import time as tm
