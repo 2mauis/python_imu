@@ -27,4 +27,3 @@ import numpy as np
 stra ="-0.094727,0.008301,1.003906,0.011706,-0.006385,0.007449"
 a=np.fromstring(stra, dtype=float, sep=', ')
 print a
-print str(a)+'a'
